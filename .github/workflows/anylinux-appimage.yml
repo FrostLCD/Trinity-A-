@@ -1,0 +1,57 @@
+name: AnyLinux AppImage (sharun, portable total)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: "Trinity AnyLinux (${{ matrix.arch }})"
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runs-on: ubuntu-24.04
+          - arch: aarch64
+            runs-on: ubuntu-24.04-arm
+    # Regla anylinux: compilar SOLO en Arch Linux (Fedora/Ubuntu rompen el deploy)
+    container: ghcr.io/pkgforge-dev/archlinux:latest
+
+    steps:
+      - name: Clonar repositorio Trinity
+        uses: actions/checkout@v4
+
+      - name: Clonar mcpe-nx
+        run: |
+          git clone ${{ secrets.MCPE_NX }} mcpe-nx > /dev/null 2>&1
+
+      - name: Construir AppImage AnyLinux
+        run: |
+          sleep 10 # el runner a veces monta el checkout del commit anterior
+          sh ./trinity-appimage.sh
+
+      - name: Subir artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: Trinity_Launcher-${{ matrix.arch }}-anylinux
+          path: dist
+
+  release:
+    if: ${{ needs.build.result == 'success' }}
+    needs: [build]
+    permissions: write-all
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Trinity_Launcher-*-anylinux
+          merge-multiple: true
+
+      - name: Subir a Release (latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          files: |
+            Trinity_Launcher-*.AppImage
+            *.zsync
