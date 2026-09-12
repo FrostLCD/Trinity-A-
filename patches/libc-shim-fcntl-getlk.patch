@@ -1,0 +1,66 @@
+From 3531d78b40d63cf99543a7a38456adfd2be6e4ba Mon Sep 17 00:00:00 2001
+From: Dicov <SrDicov@gmail.com>
+Date: Fri, 11 Sep 2026 20:53:54 -0400
+Subject: [PATCH] fix: libc-shim implementa fcntl GETLK(5) y SETLKW(7)
+
+libsqliteX (telemetria del juego) sondea F_GETLK al iniciar y el shim
+lanzaba runtime_error -> SIGABRT. Se traduce struct flock igual que
+SETLK y en GETLK se devuelven los campos al llamante.
+---
+ libc-shim/src/file_misc.cpp | 17 +++++++++++++++--
+ libc-shim/src/file_misc.h   |  4 +++-
+ 2 files changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/libc-shim/src/file_misc.cpp b/libc-shim/src/file_misc.cpp
+index 37e55b8..eaf92d2 100644
+--- a/libc-shim/src/file_misc.cpp
++++ b/libc-shim/src/file_misc.cpp
+@@ -175,7 +175,9 @@ int shim::fcntl(int fd, bionic::fcntl_index cmd, void *arg) {
+             return (int)bionic::from_host_file_status_flags(::fcntl(fd, F_GETFL));
+         case bionic::fcntl_index::SETFL:
+             return ::fcntl(fd, F_SETFL, to_host_file_status_flags((bionic::file_status_flags) (size_t) arg));
+-        case bionic::fcntl_index::SETLK: {
++        case bionic::fcntl_index::GETLK:
++        case bionic::fcntl_index::SETLK:
++        case bionic::fcntl_index::SETLKW: {
+             auto afl = (bionic::flock *) arg;
+             struct flock fl {};
+             fl.l_type = afl->l_type;
+@@ -183,7 +185,18 @@ int shim::fcntl(int fd, bionic::fcntl_index cmd, void *arg) {
+             fl.l_start = afl->l_start;
+             fl.l_len = afl->l_len;
+             fl.l_pid = afl->l_pid;
+-            return ::fcntl(fd, F_SETLK, &fl);
++            int host_cmd = (cmd == bionic::fcntl_index::GETLK) ? F_GETLK
++                         : (cmd == bionic::fcntl_index::SETLKW) ? F_SETLKW : F_SETLK;
++            int ret = ::fcntl(fd, host_cmd, &fl);
++            if (ret != -1 && cmd == bionic::fcntl_index::GETLK) {
++                // GETLK devuelve el bloqueo conflictivo en la misma estructura
++                afl->l_type = fl.l_type;
++                afl->l_whence = fl.l_whence;
++                afl->l_start = fl.l_start;
++                afl->l_len = fl.l_len;
++                afl->l_pid = fl.l_pid;
++            }
++            return ret;
+         }
+         default:
+             handle_runtime_error("Unsupported fcntl %d", (int)cmd);
+diff --git a/libc-shim/src/file_misc.h b/libc-shim/src/file_misc.h
+index 48ebded..5a602cd 100644
+--- a/libc-shim/src/file_misc.h
++++ b/libc-shim/src/file_misc.h
+@@ -38,7 +38,9 @@ namespace shim {
+             SETFD = 2,
+             GETFL = 3,
+             SETFL = 4,
+-            SETLK = 6
++            GETLK = 5,
++            SETLK = 6,
++            SETLKW = 7
+         };
+ 
+         struct flock {
+-- 
+2.55.0
+
