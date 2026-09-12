@@ -19,6 +19,10 @@ jobs:
     container: ghcr.io/pkgforge-dev/archlinux:latest
 
     steps:
+      - name: Instalar dependencias base
+        run: |
+          pacman -Sy --noconfirm git
+
       - name: Clonar repositorio Trinity
         uses: actions/checkout@v4
 
