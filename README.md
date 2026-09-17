@@ -1,6 +1,6 @@
 # Trinity Launcher 
 ### (This project is currently being maintained by a single developer. If you want to help, click the heart icon button and make a donation.)
-### Important note: On x86_64, the maximum supported version of bedrock is 26.33
+### Important note: On x86_64, the maximum supported version of bedrock is 26.50.4
 If you have an ARM-based device, you won't have any problems with the new versions.
 
 [Official Website](https://trinity-la.github.io/)
