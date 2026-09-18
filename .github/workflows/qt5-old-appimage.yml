@@ -130,7 +130,7 @@ jobs:
       - name: Subir a Release 2.6-beta
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: 2.6-beta
+          tag_name: latest
           files: |
             Trinity_Launcher-x86_64-LEGACY.AppImage
             *.zsync
