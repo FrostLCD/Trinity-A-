@@ -103,6 +103,8 @@ bool GameLauncher::launchGame(const QString &versionName, QString &errorMsg) {
     if (!QFileInfo::exists(clientPath)) {
         clientPath = QStandardPaths::findExecutable(clientBaseName);
     }
+    if (!QFileInfo::exists(clientPath))
+        clientPath = "/app/bin/" + clientBaseName;
 
 
     if (clientPath.isEmpty()) {

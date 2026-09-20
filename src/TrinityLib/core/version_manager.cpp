@@ -248,6 +248,8 @@ bool VersionManager::extractApk(const QString &apkPath, const QString &versionNa
     } else {
         QString appDir = QCoreApplication::applicationDirPath();
         QString extractorPath = appDir + "/mcpelauncher-extract";
+        if (!QFileInfo::exists(extractorPath))
+            extractorPath = "/app/bin/mcpelauncher-extract";
         if (!QFileInfo::exists(extractorPath)) {
             extractorPath = QStandardPaths::findExecutable("mcpelauncher-extract");
         }

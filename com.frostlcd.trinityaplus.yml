@@ -13,6 +13,33 @@ finish-args:
   - --talk-name=org.freedesktop.Flatpak
   - --talk-name=org.freedesktop.portal.Desktop
 modules:
+  - name: libzip
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DBUILD_SHARED_LIBS=ON
+      - -DENABLE_BZIP2=OFF
+      - -DENABLE_LZMA=OFF
+      - -DENABLE_ZSTD=OFF
+      - -DENABLE_OPENSSL=OFF
+    sources:
+      - type: git
+        url: https://github.com/nih-at/libzip.git
+        tag: v1.11.4
+  # The native Bedrock client and its helper libraries are runtime assets, not
+  # part of the Qt launcher build.
+  - name: mcpelauncher-runtime
+    buildsystem: simple
+    sources:
+      - type: archive
+        url: https://huggingface.co/datasets/ccoffee20/trinity-installer/resolve/main/binarios.tar
+        sha256: d5174864f5080a738ed3c7f065e1d37c7ce0078f0b0a59123980c4a400daa789
+    build-commands:
+      - mkdir -p /app/bin
+      - find . -type f -name 'mcpelauncher-client' -exec install -Dm755 {} /app/bin/mcpelauncher-client \;
+      - find . -type f -name 'mcpelauncher-webview' -exec install -Dm755 {} /app/bin/mcpelauncher-webview \; || true
+      - find . -type f -name 'mcpelauncher-error' -exec install -Dm755 {} /app/bin/mcpelauncher-error \; || true
+      - find . -type f -name 'msa-daemon' -exec install -Dm755 {} /app/bin/msa-daemon \; || true
+      - find . -type f -name '*.so*' -exec install -Dm644 {} /app/lib/ \; || true
   # The launcher invokes this binary when importing APKs. Build it inside the
   # sandbox so extraction does not depend on a host installation.
   - name: mcpelauncher-extract
