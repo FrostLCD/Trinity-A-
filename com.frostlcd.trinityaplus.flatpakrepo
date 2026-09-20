@@ -1,0 +1,7 @@
+[Flatpak Repo]
+Title=Trinity A+ Repository
+Description=Official Flatpak repository for Trinity A+
+Url=https://huggingface.co/datasets/ccoffee20/flatpak/resolve/main/
+Homepage=https://github.com/FrostLCD/Trinity-A-
+Icon=https://raw.githubusercontent.com/FrostLCD/Trinity-A-/main/resources/branding/com.trench.trinity.launcher.svg
+SuggestRemoteName=trinity-a-plus

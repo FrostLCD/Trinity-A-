@@ -1,4 +1,4 @@
-name: Construir y Firmar Trinity Flatpak
+name: Build Trinity A+ Flatpak
 
 on:
   workflow_dispatch: 
@@ -13,11 +13,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. Clonar Repositorio Trinity Launcher
+      - name: 1. Checkout Trinity A+
         uses: actions/checkout@v4
-        with:
-          repository: 'Trinity-LA/Trinity-Launcher'
-          ref: 'flatpak-build'
 
       - name: 2. Instalar Flatpak y Dependencias del SDK
         run: |
@@ -27,8 +24,7 @@ jobs:
           # Añadir repositorio Flathub para descargar el SDK
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           
-          # Instalar Platform y SDK de KDE 6.10 (Requerido por tu JSON)
-          flatpak install --user -y flathub org.kde.Platform//6.10 org.kde.Sdk//6.10 org.freedesktop.Sdk.Extension.llvm21  io.qt.qtwebengine.BaseApp/x86_64/6.10
+          flatpak install --user -y flathub org.kde.Platform//6.9 org.kde.Sdk//6.9
 
       - name: 3. Descargar y Extraer Binarios
         run: |
@@ -65,27 +61,35 @@ jobs:
             --repo=repo \
             --gpg-sign=3836B4996BE036C47837B97122C763D7166AAEB9 \
             build-dir \
-            com.trench.trinity.launcher.json
+            com.frostlcd.trinityaplus.yml
 
           # Actualizamos los metadatos del repositorio final con la firma
           flatpak build-update-repo --gpg-sign=3836B4996BE036C47837B97122C763D7166AAEB9 repo/
 
-      - name: 6. Generar Bundle Instalable (Opcional)
+      - name: 6. Generar metadatos de instalación
         run: |
-          # Empaqueta el repositorio en un único archivo .flatpak para facilitar su distribución directa
-          flatpak build-bundle repo/ trinity-launcher.flatpak com.trench.trinity.launcher main
-      - name: upload to hf
+          cp com.frostlcd.trinityaplus.flatpakref repo/
+          cp com.frostlcd.trinityaplus.flatpakrepo repo/
+
+      - name: 7. Generar Bundle Instalable
+        run: |
+          flatpak build-bundle repo/ trinity-a-plus.flatpak com.frostlcd.TrinityAPlus main
+
+      - name: 8. Publicar repositorio Flatpak
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python3 -m pip install -U "huggingface_hub[cli]" --break-system-packages
-          FILE=trinity-launcher.flatpak
+          FILE=trinity-a-plus.flatpak
           FILE_NAME=$(basename "$FILE")
           hf upload ccoffee20/flatpak  "$FILE" "$FILE_NAME" --repo-type dataset --token $HF_TOKEN
           hf upload ccoffee20/flatpak repo/ . --repo-type dataset --token $HF_TOKEN
-      - name: 7. Subir Artefactos
+
+      - name: 9. Subir instaladores y metadatos
         uses: actions/upload-artifact@v4
         with:
           name: Trinity-Launcher-Flatpak-Repo
           path: |
-            trinity-launcher.flatpak
+            trinity-a-plus.flatpak
+            com.frostlcd.trinityaplus.flatpakref
+            com.frostlcd.trinityaplus.flatpakrepo

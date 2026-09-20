@@ -225,7 +225,7 @@ bool GameLauncher::launchGame(const QString &versionName, QString &errorMsg) {
     if (!m_process->waitForStarted(3000)) {
         errorMsg = tr("Could not start the game process.");
         DiscordManager::instance().updateActivity(
-            tr("Trinity Launcher Menu"), tr("Waiting..."));
+            tr("Trinity A+ Menu"), tr("Waiting..."));
         return false;
     }
 

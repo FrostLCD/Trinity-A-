@@ -20,7 +20,7 @@ bool VersionManager::isFlatpak() {
 QString VersionManager::getDataRoot() {
     if (isFlatpak()) {
         return QDir::homePath()
-            + "/.var/app/com.trench.trinity.launcher/data/mcpelauncher";
+            + "/.var/app/com.frostlcd.TrinityAPlus/data/mcpelauncher";
     }
 #ifdef Q_OS_MAC
     return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)

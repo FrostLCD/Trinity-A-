@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(Trinity LANGUAGES CXX)
+project(TrinityAPlus LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,6 +39,13 @@ add_subdirectory(src/TrinityLib/ui)
 
 add_subdirectory(app)
 add_subdirectory(src/mini-matugen-j)
+
+install(TARGETS trinity RUNTIME DESTINATION bin)
+install(FILES resources/shortcuts/com.frostlcd.trinityaplus.desktop
+        DESTINATION share/applications)
+install(FILES resources/branding/com.trench.trinity.launcher.svg
+        DESTINATION share/icons/hicolor/scalable/apps
+        RENAME com.frostlcd.trinityaplus.svg)
 
 # --- Translations ---
 # Must be after add_subdirectory(app) so trinity target exists Using

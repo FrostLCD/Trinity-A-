@@ -1,0 +1,8 @@
+[Flatpak Ref]
+Name=com.frostlcd.TrinityAPlus
+Title=Trinity A+
+Description=Linux Bedrock launcher forked from Trinity Launcher
+Url=https://huggingface.co/datasets/ccoffee20/flatpak/resolve/main/
+Branch=main
+IsRuntime=false
+SuggestRemoteName=trinity-a-plus

@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QSettings>
 #include <QUuid>
@@ -80,7 +81,7 @@ void DiscordManager::updateActivity(const QString &details,
   // ── Build the SET_ACTIVITY payload ──
   QJsonObject assets;
   assets["large_image"] = "trini";
-  assets["large_text"] = "Trinity Launcher";
+  assets["large_text"] = "Trinity A+";
 
   if (!smallImageKey.isEmpty()) {
     assets["small_image"] = smallImageKey;
@@ -91,6 +92,10 @@ void DiscordManager::updateActivity(const QString &details,
   activity["details"] = details;
   activity["state"] = state;
   activity["assets"] = assets;
+  QJsonArray buttons;
+  buttons.append(QJsonObject{{"label", "Original Discord"}, {"url", "https://discord.gg/8HvMHypRrP"}});
+  buttons.append(QJsonObject{{"label", "Trinity A+ Community"}, {"url", "https://discord.gg/YW6NS3RAb"}});
+  activity["buttons"] = buttons;
 
   if (useTimer) {
     m_startTimestamp = static_cast<int64_t>(std::time(nullptr));

@@ -31,6 +31,7 @@
 #include <QPixmap>
 #include <QProcess>
 #include <QProgressBar>
+#include <QPropertyAnimation>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
@@ -59,7 +60,7 @@ LauncherWindow::LauncherWindow(QWidget *parent)
     {
         QSettings settings;
         if (!settings.value("donation_notice_shown", false).toBool()) {
-            QMessageBox::information(this, tr("Trinity Launcher"),
+            QMessageBox::information(this, tr("Trinity A+"),
                 tr("This project is currently being maintained by a single developer.\n\n"
                    "If you want to help or support, you can donate!"));
             settings.setValue("donation_notice_shown", true);
@@ -140,7 +141,7 @@ LauncherWindow::LauncherWindow(QWidget *parent)
 
 
 void LauncherWindow::setupUi() {
-    setWindowTitle("");
+    setWindowTitle(tr("Trinity A+"));
 
     resize(960, 560);
     setMinimumSize(960, 560); // Tamaño mínimo
@@ -225,7 +226,7 @@ void LauncherWindow::setupUi() {
     sidebarTrinityBtn->setIconSize(QSize(26, 26));
     sidebarTrinityBtn->setFixedSize(52, 48);
     sidebarTrinityBtn->setCursor(Qt::PointingHandCursor);
-    sidebarTrinityBtn->setToolTip(tr("Trinity"));
+    sidebarTrinityBtn->setToolTip(tr("Trinity A+"));
 
     sidebarContentBtn = new QPushButton(QIcon(":/icons/config"), "");
     sidebarContentBtn->setObjectName("SidebarBtn");
@@ -246,7 +247,7 @@ void LauncherWindow::setupUi() {
     sidebarAboutBtn->setIconSize(QSize(26, 26));
     sidebarAboutBtn->setFixedSize(52, 48);
     sidebarAboutBtn->setCursor(Qt::PointingHandCursor);
-    sidebarAboutBtn->setToolTip(tr("About Trinity Launcher"));
+    sidebarAboutBtn->setToolTip(tr("About Trinity A+"));
 
     sidebarLogBtn = new QPushButton(QIcon(":/icons/warns"), "");
     sidebarLogBtn->setObjectName("SidebarBtn");
@@ -364,6 +365,41 @@ void LauncherWindow::setupUi() {
     extractButton->setCursor(Qt::PointingHandCursor);
     dockLayout->addWidget(extractButton);
 
+    auto *apkButton = new QPushButton(tr("Download APK"));
+    apkButton->setObjectName("ActionButton");
+    apkButton->setFixedWidth(170);
+    apkButton->setMinimumHeight(44);
+    apkButton->setCursor(Qt::PointingHandCursor);
+    dockLayout->addWidget(apkButton);
+    connect(apkButton, &QPushButton::clicked, this, [this]() {
+        QDialog dialog(this);
+        dialog.setWindowTitle(tr("Download APK"));
+        dialog.setModal(true);
+        dialog.setMinimumWidth(360);
+        auto *layout = new QVBoxLayout(&dialog);
+        auto *title = new QLabel(tr("Choose a trusted APK source"));
+        title->setObjectName("VersionName");
+        layout->addWidget(title);
+        layout->addWidget(new QLabel(tr("The selected website will open in your default browser.")));
+        auto *sources = new QHBoxLayout();
+        const QList<QPair<QString, QUrl>> links = {
+            {QStringLiteral("mcpehub.org"), QUrl("https://mcpehub.org")},
+            {QStringLiteral("mcpelife.com"), QUrl("https://mcpelife.com")}
+        };
+        for (const auto &link : links) {
+            auto *button = new QPushButton(link.first);
+            button->setObjectName("ActionButton");
+            button->setCursor(Qt::PointingHandCursor);
+            connect(button, &QPushButton::clicked, &dialog, [link, &dialog]() {
+                QDesktopServices::openUrl(link.second);
+                dialog.accept();
+            });
+            sources->addWidget(button);
+        }
+        layout->addLayout(sources);
+        dialog.exec();
+    });
+
     dockLayout->addStretch();
 
     // Center: PLAY button
@@ -468,25 +504,38 @@ void LauncherWindow::setupUi() {
     discordLayout->addSpacing(10);
 
     // Discord URL Box (Clickable via QPushButton)
-    QPushButton *discordUrlBox = new QPushButton("https://discord.gg/8HvMHypRrP");
+    auto *discordLinks = new QHBoxLayout();
+    QPushButton *discordUrlBox = new QPushButton(tr("Original server"));
     discordUrlBox->setFlat(true);
     discordUrlBox->setObjectName("DiscordUrlBox");
     discordUrlBox->setMinimumHeight(40);
     discordUrlBox->setMaximumWidth(300);
     discordUrlBox->setCursor(Qt::PointingHandCursor);
     discordUrlBox->setToolTip(tr("Click to copy the link"));
-    discordLayout->addWidget(discordUrlBox, 0, Qt::AlignCenter);
+    discordLinks->addWidget(discordUrlBox);
+
+    auto *aplusDiscordUrlBox = new QPushButton(tr("A+ community"));
+    aplusDiscordUrlBox->setFlat(true);
+    aplusDiscordUrlBox->setObjectName("DiscordUrlBox");
+    aplusDiscordUrlBox->setMinimumHeight(40);
+    aplusDiscordUrlBox->setCursor(Qt::PointingHandCursor);
+    aplusDiscordUrlBox->setToolTip(tr("Open the A+ community server"));
+    discordLinks->addWidget(aplusDiscordUrlBox);
+    discordLayout->addLayout(discordLinks);
 
     connect(discordUrlBox, &QPushButton::clicked, this, [discordUrlBox]() {
         QApplication::clipboard()->setText("https://discord.gg/8HvMHypRrP");
 
-        discordUrlBox->setText(tr("✓ Copied!"));
+        discordUrlBox->setText(tr("Copied!"));
         discordUrlBox->setStyleSheet("color: #4ade80; border-color: #4ade80;");
 
         QTimer::singleShot(1500, discordUrlBox, [discordUrlBox]() {
-            discordUrlBox->setText("https://discord.gg/8HvMHypRrP");
+            discordUrlBox->setText(tr("Original server"));
             discordUrlBox->setStyleSheet(""); // revert to theme default
         });
+    });
+    connect(aplusDiscordUrlBox, &QPushButton::clicked, this, []() {
+        QDesktopServices::openUrl(QUrl("https://discord.gg/YW6NS3RAb"));
     });
 
     discordLayout->addSpacing(20);
@@ -532,12 +581,12 @@ void LauncherWindow::setupUi() {
     scrollLayout->setContentsMargins(40, 40, 40, 40);
     scrollLayout->setSpacing(20);
 
-    QLabel *aboutTitle = new QLabel(tr("About Trinity Launcher"));
+    QLabel *aboutTitle = new QLabel(tr("About Trinity A+"));
     aboutTitle->setObjectName("VersionName"); // Reusing style
     aboutTitle->setAlignment(Qt::AlignCenter);
     scrollLayout->addWidget(aboutTitle);
 
-    QLabel *aboutDesc = new QLabel(tr("Trinity Launcher is an open-source, community-driven launcher for Minecraft Bedrock. "
+    QLabel *aboutDesc = new QLabel(tr("Trinity A+ is an open-source, community-driven launcher for Minecraft Bedrock. "
                                       "Focused on user freedom and free redistribution, it provides a powerful interface to "
                                       "manage multiple instances, worlds, textures, and mods seamlessly."));
     aboutDesc->setWordWrap(true);
@@ -576,7 +625,7 @@ void LauncherWindow::setupUi() {
     teamTitle->setObjectName("Title");
     scrollLayout->addWidget(teamTitle);
 
-    QLabel *teamDesc = new QLabel(tr("Trinity is built by a dedicated group of developers, designers, and contributors:"));
+    QLabel *teamDesc = new QLabel(tr("Trinity A+ is built by a dedicated group of developers, designers, and contributors:"));
     teamDesc->setWordWrap(true);
     teamDesc->setObjectName("AboutText");
     scrollLayout->addWidget(teamDesc);
@@ -635,6 +684,16 @@ void LauncherWindow::setupUi() {
     // Helper lambda to update all sidebar button styles
     auto updateSidebar = [this](int activeIndex) {
         contentStack->setCurrentIndex(activeIndex);
+        auto *opacity = new QGraphicsOpacityEffect(contentStack);
+        contentStack->setGraphicsEffect(opacity);
+        auto *transition = new QPropertyAnimation(opacity, "opacity", contentStack);
+        transition->setDuration(180);
+        transition->setStartValue(0.35);
+        transition->setEndValue(1.0);
+        connect(transition, &QPropertyAnimation::finished, this, [this]() {
+            contentStack->setGraphicsEffect(nullptr);
+        });
+        transition->start(QAbstractAnimation::DeleteWhenStopped);
         QPushButton *btns[] = {sidebarTrinityBtn, sidebarContentBtn,
                                sidebarDiscordBtn, sidebarAboutBtn,
                                sidebarLogBtn, sidebarSettingsBtn};
@@ -1132,7 +1191,7 @@ void LauncherWindow::createDesktopShortcut() {
 #ifdef Q_OS_LINUX
     if (VersionManager::isFlatpak()) {
         execCmd = "flatpak run --command=" + clientBaseName + " "
-                  "com.trench.trinity.launcher -dg \"" +
+                  "com.frostlcd.TrinityAPlus -dg \"" +
                   versionPath + "\" -dd \"" + mcpelauncherDataDir + "\"";
     } else {
         execCmd = clientBaseName + " -dg \"" + versionPath
@@ -1156,7 +1215,7 @@ void LauncherWindow::createDesktopShortcut() {
                 "Icon=%3\n" // %3 es el identificador del icono genérico
                 "Terminal=false\n"
                 "Categories=Game;\n"
-                "Comment=Jugar a Minecraft %1 desde Trinity Launcher\n"
+                "Comment=Jugar a Minecraft %1 desde Trinity A+\n"
                 "StartupNotify=true\n")
             .arg(selectedVersion, execCmd, iconIdentifier);
 
@@ -1238,11 +1297,11 @@ void LauncherWindow::applyTheme(const QString &accent,
             "QListWidget::item:selected { background-color: %1; color: %7; }"
             "QListWidget::item:hover { background-color: %4; }"
             "QPushButton { background-color: %4; border: none; "
-            "border-radius: 0px; padding: 8px 16px; color: %7; "
+            "border-radius: 10px; padding: 8px 16px; color: %7; "
             "font-weight: bold; font-size: 14px; }"
             "QPushButton:hover { background-color: %5; }"
             "QPushButton:pressed { background-color: %2; }"
-            "QPushButton#ActionButton { background-color: %1; color: %7; }"
+            "QPushButton#ActionButton { background-color: %1; color: %7; border-radius: 12px; }"
             "QPushButton#ActionButton:hover { background-color: %1; opacity: 0.85; }"
             "QLabel#Title { font-size: 14px; font-weight: bold; color: %1; background: transparent; }"
             "QLabel#VersionName { font-size: 14px; font-weight: bold; background: transparent; }"
@@ -1279,7 +1338,7 @@ void LauncherWindow::applyTheme(const QString &accent,
             "QComboBox#DockCombo QAbstractItemView { background-color: %3; "
             "selection-background-color: %1; color: %7; border-radius: 0px; }"
             // Generic ComboBox (settings, etc.)
-            "QComboBox { background-color: %4; color: %7; border-radius: 0px; "
+            "QComboBox { background-color: %4; color: %7; border-radius: 10px; "
             "padding: 6px 10px; font-size: 14px; }"
             "QComboBox::drop-down { border: 0px; }"
             "QComboBox QAbstractItemView { background-color: %3; "
@@ -1289,8 +1348,9 @@ void LauncherWindow::applyTheme(const QString &accent,
             "border: 1px dashed %5; border-radius: 0px; padding: 8px; "
             "font-size: 14px; font-weight: bold; text-align: center; }"
             // Themed checkbox
-            "QCheckBox#ThemeCheckBox::indicator { width: 22px; height: 22px; border-radius: 0px; "
-            "background-color: %4; border: 2px solid %5; }"
+            "QCheckBox#ThemeCheckBox { spacing: 8px; }"
+            "QCheckBox#ThemeCheckBox::indicator { width: 42px; height: 24px; border-radius: 12px; "
+            "background-color: %4; border: 1px solid %5; }"
             "QCheckBox#ThemeCheckBox::indicator:checked { background-color: %1; border-color: %1; }"
             // Themed radio button
             "QRadioButton { background: transparent; color: %7; font-size: 13px; spacing: 8px; }"
@@ -1796,7 +1856,7 @@ QWidget *LauncherWindow::createSettingsPage() {
     };
 
     QList<IconEntry> icons = {
-        { tr("Trinity (Home)"),   "icon/trinity",  ":/icons/cube-w",  sidebarTrinityBtn },
+        { tr("Trinity A+ (Home)"),   "icon/trinity",  ":/icons/cube-w",  sidebarTrinityBtn },
         { tr("Content Manager"),  "icon/content",  ":/icons/config",  sidebarContentBtn },
         { tr("Discord"),          "icon/discord",  ":/icons/discord", sidebarDiscordBtn },
         { tr("About"),            "icon/about",    ":/icons/heart",   sidebarAboutBtn   },

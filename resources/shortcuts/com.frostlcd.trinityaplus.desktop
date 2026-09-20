@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Trinity A+
 Exec=trinity
-Icon=com.trench.trinity.launcher
+Icon=com.frostlcd.trinityaplus
 Terminal=false
 Type=Application
 Categories=Game;
