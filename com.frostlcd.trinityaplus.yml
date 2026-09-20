@@ -33,10 +33,8 @@ modules:
       - type: file
         url: https://huggingface.co/datasets/ccoffee20/trinity-installer/resolve/main/binarios.tar
         sha256: d5174864f5080a738ed3c7f065e1d37c7ce0078f0b0a59123980c4a400daa789
-        dest-filename: runtime.tar
     build-commands:
-      - install -Dm755 runtime.tar /tmp/runtime.tar
-      - tar -xf /tmp/runtime.tar -C /tmp
+      - runtime_archive="$(find . -maxdepth 2 -type f -name '*.tar' -print -quit)"; test -n "$runtime_archive"; tar -xf "$runtime_archive" -C /tmp
       - install -Dm755 /tmp/mcpelauncher-client /app/bin/mcpelauncher-client
       - install -Dm755 /tmp/mcpelauncher-webview /app/bin/mcpelauncher-webview
   # The launcher invokes this binary when importing APKs. Build it inside the
