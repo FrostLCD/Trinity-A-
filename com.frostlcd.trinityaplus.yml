@@ -25,22 +25,20 @@ modules:
       - type: git
         url: https://github.com/nih-at/libzip.git
         tag: v1.11.4
-  # The native Bedrock client and its helper libraries are runtime assets, not
-  # part of the Qt launcher build.
+  # Download the two runtime executables as explicit files. A tar archive with
+  # top-level files is not reliably unpacked by every flatpak-builder version.
   - name: mcpelauncher-runtime
     buildsystem: simple
     sources:
-      - type: archive
+      - type: file
         url: https://huggingface.co/datasets/ccoffee20/trinity-installer/resolve/main/binarios.tar
         sha256: d5174864f5080a738ed3c7f065e1d37c7ce0078f0b0a59123980c4a400daa789
+        dest-filename: runtime.tar
     build-commands:
-      - mkdir -p /app/bin
-      - test -n "$(find . -type f -name 'mcpelauncher-client' -print -quit)" || (echo "mcpelauncher-client is missing from the runtime archive" >&2; exit 1)
-      - find . -type f -name 'mcpelauncher-client' -exec install -Dm755 {} /app/bin/mcpelauncher-client \;
-      - find . -type f -name 'mcpelauncher-webview' -exec install -Dm755 {} /app/bin/mcpelauncher-webview \; || true
-      - find . -type f -name 'mcpelauncher-error' -exec install -Dm755 {} /app/bin/mcpelauncher-error \; || true
-      - find . -type f -name 'msa-daemon' -exec install -Dm755 {} /app/bin/msa-daemon \; || true
-      - find . -type f -name '*.so*' -exec install -Dm644 {} /app/lib/ \; || true
+      - install -Dm755 runtime.tar /tmp/runtime.tar
+      - tar -xf /tmp/runtime.tar -C /tmp
+      - install -Dm755 /tmp/mcpelauncher-client /app/bin/mcpelauncher-client
+      - install -Dm755 /tmp/mcpelauncher-webview /app/bin/mcpelauncher-webview
   # The launcher invokes this binary when importing APKs. Build it inside the
   # sandbox so extraction does not depend on a host installation.
   - name: mcpelauncher-extract
