@@ -11,7 +11,16 @@ finish-args:
   - --device=dri
   - --filesystem=home
   - --talk-name=org.freedesktop.Flatpak
+  - --talk-name=org.freedesktop.portal.Desktop
 modules:
+  # The launcher invokes this binary when importing APKs. Build it inside the
+  # sandbox so extraction does not depend on a host installation.
+  - name: mcpelauncher-extract
+    buildsystem: cmake-ninja
+    sources:
+      - type: git
+        url: https://github.com/minecraft-linux/mcpelauncher-extract.git
+        branch: ng
   - name: trinity-a-plus
     buildsystem: cmake-ninja
     config-opts:

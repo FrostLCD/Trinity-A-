@@ -22,7 +22,6 @@
 #include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
-#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -53,13 +52,25 @@ bool openExternalUrl(const QUrl &url) {
     if (QDesktopServices::openUrl(url))
         return true;
 #ifdef Q_OS_LINUX
-    // Flatpak applications may not have a portal handler configured. Ask the
+    // Portals can be unavailable in minimal Flatpak installations. Ask the
     // host desktop to open the URL as a last resort.
-    if (VersionManager::isFlatpak())
-        return QProcess::startDetached(QStringLiteral("flatpak-spawn"),
-                                       {QStringLiteral("--host"),
-                                        QStringLiteral("xdg-open"), url.toString()});
+    if (VersionManager::isFlatpak() &&
+        QProcess::startDetached(QStringLiteral("flatpak-spawn"),
+                                {QStringLiteral("--host"),
+                                 QStringLiteral("xdg-open"), url.toString()}))
+        return true;
+    if (QProcess::startDetached(QStringLiteral("xdg-open"), {url.toString()}))
+        return true;
 #endif
+    return false;
+}
+
+bool openExternalUrl(QWidget *parent, const QUrl &url) {
+    if (openExternalUrl(url))
+        return true;
+    QMessageBox::warning(parent, QObject::tr("Unable to open link"),
+                         QObject::tr("No browser could be opened for this link:\n%1")
+                             .arg(url.toString()));
     return false;
 }
 }
@@ -89,6 +100,11 @@ LauncherWindow::LauncherWindow(QWidget *parent)
     // Show one-time donation notice
     {
         QSettings settings;
+        // Profiles are no longer part of the launcher UI. Remove values
+        // written by older versions so account data is not retained.
+        settings.remove("profiles");
+        settings.remove("profile");
+        settings.remove("profile/selected");
         if (!settings.value("donation_notice_shown", false).toBool()) {
             QMessageBox::information(this, tr("Trinity A+"),
                 tr("This project is currently being maintained by a single developer.\n\n"
@@ -346,7 +362,7 @@ void LauncherWindow::setupUi() {
     versionList->setVisible(false);
     versionList->setIconSize(QSize(32, 32));
 
-    // Header overlay: logo, current local profile and a compact account changer.
+    // Header overlay: logo and launcher branding.
     {
         QHBoxLayout *topLogoRow = new QHBoxLayout();
         topLogoRow->setContentsMargins(28, 22, 28, 0);
@@ -364,50 +380,6 @@ void LauncherWindow::setupUi() {
         topLogoRow->addWidget(brand);
         topLogoRow->addStretch();
 
-        auto *profileLabel = new QLabel(tr("PROFILE"));
-        profileLabel->setObjectName("EyebrowLabel");
-        topLogoRow->addWidget(profileLabel);
-        auto *profileCombo = new QComboBox();
-        profileCombo->setObjectName("ProfileCombo");
-        profileCombo->setMinimumWidth(150);
-        profileCombo->setMinimumHeight(40);
-        QSettings profileSettings;
-        QStringList profiles = profileSettings.value("profiles",
-            QStringList{tr("Steve"), tr("Alex")}).toStringList();
-        if (profiles.isEmpty())
-            profiles << tr("Steve");
-        profileCombo->addItems(profiles);
-        profileCombo->setCurrentText(profileSettings.value("profile/selected",
-            profiles.first()).toString());
-        connect(profileCombo, &QComboBox::currentTextChanged, this,
-                [](const QString &profile) {
-                    QSettings settings;
-                    settings.setValue("profile/selected", profile);
-                });
-        topLogoRow->addWidget(profileCombo);
-        auto *manageProfile = new QPushButton(tr("Manage"));
-        manageProfile->setObjectName("GhostButton");
-        manageProfile->setMinimumHeight(40);
-        manageProfile->setCursor(Qt::PointingHandCursor);
-        connect(manageProfile, &QPushButton::clicked, this,
-                [this, profileCombo]() {
-                    bool accepted = false;
-                    const QString name = QInputDialog::getText(
-                        this, tr("Profile"), tr("Profile name:"),
-                        QLineEdit::Normal, profileCombo->currentText(), &accepted);
-                    if (!accepted || name.trimmed().isEmpty())
-                        return;
-                    const QString cleanName = name.trimmed();
-                    if (profileCombo->findText(cleanName) < 0)
-                        profileCombo->addItem(cleanName);
-                    profileCombo->setCurrentText(cleanName);
-                    QSettings settings;
-                    QStringList names;
-                    for (int i = 0; i < profileCombo->count(); ++i)
-                        names << profileCombo->itemText(i);
-                    settings.setValue("profiles", names);
-                });
-        topLogoRow->addWidget(manageProfile);
         rootLayout->addLayout(topLogoRow);
     }
 
@@ -432,6 +404,35 @@ void LauncherWindow::setupUi() {
     subtitle->setObjectName("DashboardSubtitle");
     subtitle->setAlignment(Qt::AlignCenter);
     rootLayout->addWidget(subtitle);
+
+    auto *quickActions = new QHBoxLayout();
+    quickActions->setContentsMargins(48, 8, 48, 8);
+    quickActions->setSpacing(10);
+    installedCountLabel = new QLabel(tr("Installed versions: 0"));
+    installedCountLabel->setObjectName("DashboardEyebrow");
+    quickActions->addWidget(installedCountLabel);
+    quickActions->addStretch();
+    auto *refreshButton = new QPushButton(tr("Refresh"));
+    auto *logsButton = new QPushButton(tr("Open logs"));
+    auto *settingsButton = new QPushButton(tr("Settings"));
+    for (auto *button : {refreshButton, logsButton, settingsButton}) {
+        button->setObjectName("GhostButton");
+        button->setCursor(Qt::PointingHandCursor);
+    }
+    quickActions->addWidget(refreshButton);
+    quickActions->addWidget(logsButton);
+    quickActions->addWidget(settingsButton);
+    rootLayout->addLayout(quickActions);
+    connect(refreshButton, &QPushButton::clicked, this, [this]() {
+        loadInstalledVersions();
+        statusLabel->setText(tr("Version list refreshed."));
+    });
+    connect(logsButton, &QPushButton::clicked, this, [this]() {
+        contentStack->setCurrentIndex(4);
+    });
+    connect(settingsButton, &QPushButton::clicked, this, [this]() {
+        contentStack->setCurrentIndex(5);
+    });
     rootLayout->addStretch();
 
     // ── Floating dock ──────────────────────────────────────────────────────
@@ -479,8 +480,8 @@ void LauncherWindow::setupUi() {
             button->setObjectName("ActionButton");
             button->setCursor(Qt::PointingHandCursor);
             connect(button, &QPushButton::clicked, &dialog, [this, link, &dialog]() {
-                openExternalUrl(link.second);
-                dialog.accept();
+                if (openExternalUrl(this, link.second))
+                    dialog.accept();
             });
             sources->addWidget(button);
         }
@@ -611,8 +612,9 @@ void LauncherWindow::setupUi() {
     discordLinks->addWidget(aplusDiscordUrlBox);
     discordLayout->addLayout(discordLinks);
 
-    connect(discordUrlBox, &QPushButton::clicked, this, [discordUrlBox]() {
+    connect(discordUrlBox, &QPushButton::clicked, this, [this, discordUrlBox]() {
         QApplication::clipboard()->setText("https://discord.gg/8HvMHypRrP");
+        openExternalUrl(this, QUrl("https://discord.gg/8HvMHypRrP"));
 
         discordUrlBox->setText(tr("Copied!"));
         discordUrlBox->setStyleSheet("color: #4ade80; border-color: #4ade80;");
@@ -622,8 +624,8 @@ void LauncherWindow::setupUi() {
             discordUrlBox->setStyleSheet(""); // revert to theme default
         });
     });
-    connect(aplusDiscordUrlBox, &QPushButton::clicked, this, []() {
-        QDesktopServices::openUrl(QUrl("https://discord.gg/YW6NS3RAb"));
+    connect(aplusDiscordUrlBox, &QPushButton::clicked, this, [this]() {
+        openExternalUrl(this, QUrl("https://discord.gg/YW6NS3RAb"));
     });
 
     discordLayout->addSpacing(20);
@@ -700,8 +702,8 @@ void LauncherWindow::setupUi() {
     donateBtn->setCursor(Qt::PointingHandCursor);
     scrollLayout->addWidget(donateBtn, 0, Qt::AlignCenter);
 
-    connect(donateBtn, &QPushButton::clicked, this, []() {
-        QDesktopServices::openUrl(QUrl("https://linktr.ee/javiercplusx"));
+    connect(donateBtn, &QPushButton::clicked, this, [this]() {
+        openExternalUrl(this, QUrl("https://linktr.ee/javiercplusx"));
     });
 
     QFrame *donateSep2 = new QFrame();
@@ -851,6 +853,8 @@ void LauncherWindow::loadInstalledVersions() {
     versionCombo->clear();
     VersionManager vm;
     QStringList versions = vm.getInstalledVersions();
+    if (installedCountLabel)
+        installedCountLabel->setText(tr("Installed versions: %1").arg(versions.size()));
 
     for (const QString &v : versions) {
         QListWidgetItem *item = new QListWidgetItem(v);
@@ -1432,7 +1436,7 @@ void LauncherWindow::applyTheme(const QString &accent,
             "QWidget#FloatingDock { background-color: rgba(%8, %9, %10, 0.92); "
             "border-radius: 18px; border: 1px solid rgba(%11, %12, %13, 0.35); }"
             // Dock combo
-            "QComboBox#DockCombo, QComboBox#ProfileCombo { background-color: %4; color: %7; border-radius: 10px; "
+            "QComboBox#DockCombo { background-color: %4; color: %7; border-radius: 10px; "
             "border: 1px solid %1; padding: 6px 12px; font-size: 14px; }"
             "QComboBox#DockCombo::drop-down { border: 0px; }"
             "QComboBox#DockCombo QAbstractItemView { background-color: %3; "

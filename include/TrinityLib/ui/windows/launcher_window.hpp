@@ -87,6 +87,7 @@ class LauncherWindow : public QWidget {
         Exporter *exporter;
         // Status Bar
         QLabel *statusLabel;
+        QLabel *installedCountLabel;
         QLabel *launcherTitle; // Title label for glow effect
         QPushButton *shortcutButton;
         QComboBox *settingsLanguageCombo; // Language selector shown in Settings
