@@ -46,6 +46,8 @@ install(FILES resources/shortcuts/com.frostlcd.trinityaplus.desktop
 install(FILES resources/branding/com.trench.trinity.launcher.svg
         DESTINATION share/icons/hicolor/scalable/apps
         RENAME com.frostlcd.trinityaplus.svg)
+install(FILES resources/branding/aplus-mark.svg
+        DESTINATION share/icons/hicolor/scalable/apps)
 
 # --- Translations ---
 # Must be after add_subdirectory(app) so trinity target exists Using

@@ -20,5 +20,6 @@
         <file alias="logo">branding/logo_full.png</file>
         <file alias="background">branding/background.png</file>
         <file alias="letter-brand">branding/letter-brand.png</file>
+        <file alias="aplus-mark">branding/aplus-mark.svg</file>
     </qresource>
 </RCC>

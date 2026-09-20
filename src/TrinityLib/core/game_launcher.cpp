@@ -10,6 +10,7 @@
 #include <QRegularExpression>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QFileDevice>
 #include <iostream>
 
 GameLauncher::GameLauncher(QObject *parent)
@@ -98,19 +99,30 @@ bool GameLauncher::launchGame(const QString &versionName, QString &errorMsg) {
 
     // Select the appropriate client based on architecture
     QString clientBaseName = isX86Version ? "mcpelauncher-client86" : "mcpelauncher-client";
-    QString clientPath = appDir + "/" + clientBaseName;
-
-    if (!QFileInfo::exists(clientPath)) {
-        clientPath = QStandardPaths::findExecutable(clientBaseName);
+    // Flatpak puts bundled helpers in /app/bin.  Keep the application-local
+    // and PATH lookups for AppImage/native installs, but only accept an
+    // executable file; passing a non-existent path to QProcess otherwise
+    // produces the unhelpful "Could not start..." message.
+    const QStringList candidates = {
+        appDir + "/" + clientBaseName,
+        QStringLiteral("/app/bin/") + clientBaseName,
+        QStandardPaths::findExecutable(clientBaseName)
+    };
+    QString clientPath;
+    for (const QString &candidate : candidates) {
+        if (!candidate.isEmpty() && QFileInfo(candidate).isFile() &&
+            QFileInfo(candidate).isExecutable()) {
+            clientPath = QFileInfo(candidate).canonicalFilePath();
+            break;
+        }
     }
-    if (!QFileInfo::exists(clientPath))
-        clientPath = "/app/bin/" + clientBaseName;
-
 
     if (clientPath.isEmpty()) {
-        errorMsg = isX86Version
-            ? tr("mcpelauncher-client86 not found.")
-            : tr("mcpelauncher-client not found.");
+        errorMsg = tr("%1 was not found or is not executable.\n"
+                      "Checked: %2\n"
+                      "Install the mcpelauncher runtime or rebuild the Flatpak.")
+            .arg(clientBaseName, candidates.join(", "));
+        emit gameOutput("[Trinity] " + errorMsg + "\n");
         return false;
     }
 
@@ -121,6 +133,17 @@ bool GameLauncher::launchGame(const QString &versionName, QString &errorMsg) {
          << "-dd" << VersionManager::getDataRoot();
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    // The native client uses this to locate bridge assets and it is also
+    // useful when launching from a desktop file where the host environment
+    // does not contain mcpelauncher's data path.
+    env.insert("MCPELAUNCHER_DATA_DIR", VersionManager::getDataRoot());
+    if (VersionManager::isFlatpak()) {
+        const QString bundledLibs = QStringLiteral("/app/lib");
+        const QString oldLibraryPath = env.value("LD_LIBRARY_PATH");
+        env.insert("LD_LIBRARY_PATH", oldLibraryPath.isEmpty()
+            ? bundledLibs
+            : bundledLibs + ":" + oldLibraryPath);
+    }
     if (!extraEnvStr.isEmpty()) {
         // Parse KEY=VALUE entries separated by newlines and/or spaces.
         // Uses KEY= occurrences as delimiters so values that contain spaces
@@ -207,6 +230,7 @@ bool GameLauncher::launchGame(const QString &versionName, QString &errorMsg) {
         env.insert("__GLX_VENDOR_LIBRARY_NAME", "nvidia");
     }
     m_process->setProcessEnvironment(env);
+    m_process->setWorkingDirectory(dataDir);
 
     QString displayServer =
         qgetenv("XDG_SESSION_TYPE") == "wayland" ? "Wayland" : "X11";
@@ -225,7 +249,11 @@ bool GameLauncher::launchGame(const QString &versionName, QString &errorMsg) {
     m_process->start();
 
     if (!m_process->waitForStarted(3000)) {
-        errorMsg = tr("Could not start the game process.");
+        errorMsg = tr("Could not start the game process.\n"
+                      "Executable: %1\n"
+                      "Reason: %2")
+            .arg(clientPath, m_process->errorString());
+        emit gameOutput("[Trinity] " + errorMsg + "\n");
         DiscordManager::instance().updateActivity(
             tr("Trinity A+ Menu"), tr("Waiting..."));
         return false;

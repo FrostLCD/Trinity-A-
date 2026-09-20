@@ -177,6 +177,26 @@ docker run --rm -it \
 
 ## 7. Method 4: Flatpak Packaging
 
+The Flatpak bundles `mcpelauncher-client` at `/app/bin` and the launcher
+selects that path before consulting the host `PATH`. To update an existing
+checkout and verify the runtime before launching:
+
+```bash
+flatpak-builder --user --install --force-clean build-flatpak \
+  com.frostlcd.trinityaplus.yml
+flatpak run --command=sh com.frostlcd.TrinityAPlus \
+  -c 'command -v mcpelauncher-client && test -x /app/bin/mcpelauncher-client'
+flatpak run com.frostlcd.TrinityAPlus
+```
+
+If the game still fails to start, open **Log** in Trinity A+ (the executable
+path and `QProcess` error are recorded there), or capture the same diagnostics
+from a terminal:
+
+```bash
+flatpak run com.frostlcd.TrinityAPlus 2>&1 | tee trinity-launcher.log
+```
+
 To compile and package Trinity as a Flatpak application (ideal for distribution):
 
 ```bash
@@ -195,4 +215,3 @@ flatpak build-bundle repo trinity.flatpak com.trench.trinity.launcher
 
 # 5. Install on the system
 flatpak install ./trinity.flatpak
-

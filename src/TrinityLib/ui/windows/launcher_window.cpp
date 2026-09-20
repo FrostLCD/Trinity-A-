@@ -221,7 +221,12 @@ void LauncherWindow::setupUi() {
     titleLayout->setContentsMargins(12, 0, 0, 0);
     titleLayout->setSpacing(0);
 
-    QLabel *titleLabel = new QLabel(tr(""), m_titleBar);
+    auto *titleBarMark = new QLabel(m_titleBar);
+    titleBarMark->setPixmap(QPixmap(":/branding/aplus-mark").scaled(
+        22, 22, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    titleBarMark->setToolTip(tr("Trinity A+"));
+    titleLayout->addWidget(titleBarMark);
+    QLabel *titleLabel = new QLabel(tr("TRINITY A+"), m_titleBar);
     titleLabel->setObjectName("TitleBarLabel");
     titleLayout->addWidget(titleLabel);
     titleLayout->addStretch();
@@ -375,6 +380,11 @@ void LauncherWindow::setupUi() {
             "border-radius: 12px;"
             "background: transparent;");
         topLogoRow->addWidget(logoLabel);
+        auto *brandMark = new QLabel();
+        brandMark->setPixmap(QPixmap(":/branding/aplus-mark").scaled(
+            36, 36, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        brandMark->setToolTip(tr("Trinity A+"));
+        topLogoRow->addWidget(brandMark);
         auto *brand = new QLabel(tr("TRINITY A+"));
         brand->setObjectName("BrandLabel");
         topLogoRow->addWidget(brand);
@@ -398,7 +408,17 @@ void LauncherWindow::setupUi() {
         .scaled(400, 162, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     launcherTitle->setStyleSheet("background: transparent;");
 
-    rootLayout->addWidget(launcherTitle, 0, Qt::AlignCenter);
+    auto *launcherTitleRow = new QHBoxLayout();
+    launcherTitleRow->setContentsMargins(0, 0, 0, 0);
+    auto *titleMark = new QLabel();
+    titleMark->setPixmap(QPixmap(":/branding/aplus-mark").scaled(
+        76, 76, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    titleMark->setToolTip(tr("Trinity A+"));
+    launcherTitleRow->addStretch();
+    launcherTitleRow->addWidget(titleMark);
+    launcherTitleRow->addWidget(launcherTitle);
+    launcherTitleRow->addStretch();
+    rootLayout->addLayout(launcherTitleRow);
 
     auto *subtitle = new QLabel(tr("Your worlds. Your versions. Your way."));
     subtitle->setObjectName("DashboardSubtitle");
