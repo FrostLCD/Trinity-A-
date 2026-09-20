@@ -22,6 +22,7 @@
 #include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -47,12 +48,41 @@
 #include <QWindow>
 #include <QGraphicsDropShadowEffect>
 
+namespace {
+bool openExternalUrl(const QUrl &url) {
+    if (QDesktopServices::openUrl(url))
+        return true;
+#ifdef Q_OS_LINUX
+    // Flatpak applications may not have a portal handler configured. Ask the
+    // host desktop to open the URL as a last resort.
+    if (VersionManager::isFlatpak())
+        return QProcess::startDetached(QStringLiteral("flatpak-spawn"),
+                                       {QStringLiteral("--host"),
+                                        QStringLiteral("xdg-open"), url.toString()});
+#endif
+    return false;
+}
+}
+
 LauncherWindow::LauncherWindow(QWidget *parent)
     : QWidget(parent) {
     setupUi();
     setupConnections();
     loadInstalledVersions();
     exporter = new Exporter(this);
+
+    // A short entrance animation gives the dashboard a calm startup state
+    // without delaying version discovery or any launcher actions.
+    if (launcherTitle) {
+        auto *effect = new QGraphicsOpacityEffect(launcherTitle);
+        launcherTitle->setGraphicsEffect(effect);
+        auto *intro = new QPropertyAnimation(effect, "opacity", launcherTitle);
+        intro->setDuration(520);
+        intro->setStartValue(0.0);
+        intro->setEndValue(1.0);
+        intro->setEasingCurve(QEasingCurve::OutCubic);
+        intro->start(QAbstractAnimation::DeleteWhenStopped);
+    }
 
     m_gameLauncher = new GameLauncher(this);
 
@@ -144,7 +174,7 @@ void LauncherWindow::setupUi() {
     setWindowTitle(tr("Trinity A+"));
 
     resize(960, 560);
-    setMinimumSize(960, 560); // Tamaño mínimo
+    setMinimumSize(820, 560);
     setWindowFlags(Qt::FramelessWindowHint);
 
 
@@ -216,7 +246,7 @@ void LauncherWindow::setupUi() {
     // --- Sidebar ---
     QWidget *sidebar = new QWidget();
     sidebar->setObjectName("Sidebar");
-    sidebar->setFixedWidth(52);
+    sidebar->setFixedWidth(72);
     QVBoxLayout *sidebarLayout = new QVBoxLayout(sidebar);
     sidebarLayout->setContentsMargins(0, 8, 0, 8);
     sidebarLayout->setSpacing(4);
@@ -224,42 +254,42 @@ void LauncherWindow::setupUi() {
     sidebarTrinityBtn = new QPushButton(QIcon(":/icons/cube-w"), "");
     sidebarTrinityBtn->setObjectName("SidebarBtnActive");
     sidebarTrinityBtn->setIconSize(QSize(26, 26));
-    sidebarTrinityBtn->setFixedSize(52, 48);
+    sidebarTrinityBtn->setFixedSize(72, 52);
     sidebarTrinityBtn->setCursor(Qt::PointingHandCursor);
     sidebarTrinityBtn->setToolTip(tr("Trinity A+"));
 
     sidebarContentBtn = new QPushButton(QIcon(":/icons/config"), "");
     sidebarContentBtn->setObjectName("SidebarBtn");
     sidebarContentBtn->setIconSize(QSize(26, 26));
-    sidebarContentBtn->setFixedSize(52, 48);
+    sidebarContentBtn->setFixedSize(72, 52);
     sidebarContentBtn->setCursor(Qt::PointingHandCursor);
     sidebarContentBtn->setToolTip(tr("Content Manager"));
 
     sidebarDiscordBtn = new QPushButton(QIcon(":/icons/discord"), "");
     sidebarDiscordBtn->setObjectName("SidebarBtn");
     sidebarDiscordBtn->setIconSize(QSize(26, 26));
-    sidebarDiscordBtn->setFixedSize(52, 48);
+    sidebarDiscordBtn->setFixedSize(72, 52);
     sidebarDiscordBtn->setCursor(Qt::PointingHandCursor);
     sidebarDiscordBtn->setToolTip(tr("Discord"));
 
     sidebarAboutBtn = new QPushButton(QIcon(":/icons/heart"), "");
     sidebarAboutBtn->setObjectName("SidebarBtn");
     sidebarAboutBtn->setIconSize(QSize(26, 26));
-    sidebarAboutBtn->setFixedSize(52, 48);
+    sidebarAboutBtn->setFixedSize(72, 52);
     sidebarAboutBtn->setCursor(Qt::PointingHandCursor);
     sidebarAboutBtn->setToolTip(tr("About Trinity A+"));
 
     sidebarLogBtn = new QPushButton(QIcon(":/icons/warns"), "");
     sidebarLogBtn->setObjectName("SidebarBtn");
     sidebarLogBtn->setIconSize(QSize(26, 26));
-    sidebarLogBtn->setFixedSize(52, 48);
+    sidebarLogBtn->setFixedSize(72, 52);
     sidebarLogBtn->setCursor(Qt::PointingHandCursor);
     sidebarLogBtn->setToolTip(tr("Log"));
 
     sidebarSettingsBtn = new QPushButton(QIcon(":/icons/settings"), "");
     sidebarSettingsBtn->setObjectName("SidebarBtn");
     sidebarSettingsBtn->setIconSize(QSize(26, 26));
-    sidebarSettingsBtn->setFixedSize(52, 48);
+    sidebarSettingsBtn->setFixedSize(72, 52);
     sidebarSettingsBtn->setCursor(Qt::PointingHandCursor);
     sidebarSettingsBtn->setToolTip(tr("Settings"));
 
@@ -316,23 +346,77 @@ void LauncherWindow::setupUi() {
     versionList->setVisible(false);
     versionList->setIconSize(QSize(32, 32));
 
-    // Logo overlay — top-right of the background image
+    // Header overlay: logo, current local profile and a compact account changer.
     {
         QHBoxLayout *topLogoRow = new QHBoxLayout();
-        topLogoRow->setContentsMargins(14, 10, 14, 0);
+        topLogoRow->setContentsMargins(28, 22, 28, 0);
+        topLogoRow->setSpacing(12);
 
         QLabel *logoLabel = new QLabel();
-        logoLabel->setFixedSize(38, 38);
+        logoLabel->setFixedSize(44, 44);
         logoLabel->setStyleSheet(
             "border-image: url(:/branding/logo);"
-            "border-radius: 0px;"
+            "border-radius: 12px;"
             "background: transparent;");
-        topLogoRow->addStretch();
         topLogoRow->addWidget(logoLabel);
+        auto *brand = new QLabel(tr("TRINITY A+"));
+        brand->setObjectName("BrandLabel");
+        topLogoRow->addWidget(brand);
+        topLogoRow->addStretch();
+
+        auto *profileLabel = new QLabel(tr("PROFILE"));
+        profileLabel->setObjectName("EyebrowLabel");
+        topLogoRow->addWidget(profileLabel);
+        auto *profileCombo = new QComboBox();
+        profileCombo->setObjectName("ProfileCombo");
+        profileCombo->setMinimumWidth(150);
+        profileCombo->setMinimumHeight(40);
+        QSettings profileSettings;
+        QStringList profiles = profileSettings.value("profiles",
+            QStringList{tr("Steve"), tr("Alex")}).toStringList();
+        if (profiles.isEmpty())
+            profiles << tr("Steve");
+        profileCombo->addItems(profiles);
+        profileCombo->setCurrentText(profileSettings.value("profile/selected",
+            profiles.first()).toString());
+        connect(profileCombo, &QComboBox::currentTextChanged, this,
+                [](const QString &profile) {
+                    QSettings settings;
+                    settings.setValue("profile/selected", profile);
+                });
+        topLogoRow->addWidget(profileCombo);
+        auto *manageProfile = new QPushButton(tr("Manage"));
+        manageProfile->setObjectName("GhostButton");
+        manageProfile->setMinimumHeight(40);
+        manageProfile->setCursor(Qt::PointingHandCursor);
+        connect(manageProfile, &QPushButton::clicked, this,
+                [this, profileCombo]() {
+                    bool accepted = false;
+                    const QString name = QInputDialog::getText(
+                        this, tr("Profile"), tr("Profile name:"),
+                        QLineEdit::Normal, profileCombo->currentText(), &accepted);
+                    if (!accepted || name.trimmed().isEmpty())
+                        return;
+                    const QString cleanName = name.trimmed();
+                    if (profileCombo->findText(cleanName) < 0)
+                        profileCombo->addItem(cleanName);
+                    profileCombo->setCurrentText(cleanName);
+                    QSettings settings;
+                    QStringList names;
+                    for (int i = 0; i < profileCombo->count(); ++i)
+                        names << profileCombo->itemText(i);
+                    settings.setValue("profiles", names);
+                });
+        topLogoRow->addWidget(manageProfile);
         rootLayout->addLayout(topLogoRow);
     }
 
-    rootLayout->addStretch();
+    rootLayout->addSpacing(18);
+
+    auto *welcome = new QLabel(tr("Welcome back"));
+    welcome->setObjectName("DashboardEyebrow");
+    welcome->setAlignment(Qt::AlignCenter);
+    rootLayout->addWidget(welcome);
 
     // ── Launcher Brand Image ─────────────────────────────────────────────────────
     launcherTitle = new QLabel(launcherTab);
@@ -344,6 +428,10 @@ void LauncherWindow::setupUi() {
 
     rootLayout->addWidget(launcherTitle, 0, Qt::AlignCenter);
 
+    auto *subtitle = new QLabel(tr("Your worlds. Your versions. Your way."));
+    subtitle->setObjectName("DashboardSubtitle");
+    subtitle->setAlignment(Qt::AlignCenter);
+    rootLayout->addWidget(subtitle);
     rootLayout->addStretch();
 
     // ── Floating dock ──────────────────────────────────────────────────────
@@ -390,8 +478,8 @@ void LauncherWindow::setupUi() {
             auto *button = new QPushButton(link.first);
             button->setObjectName("ActionButton");
             button->setCursor(Qt::PointingHandCursor);
-            connect(button, &QPushButton::clicked, &dialog, [link, &dialog]() {
-                QDesktopServices::openUrl(link.second);
+            connect(button, &QPushButton::clicked, &dialog, [this, link, &dialog]() {
+                openExternalUrl(link.second);
                 dialog.accept();
             });
             sources->addWidget(button);
@@ -1291,30 +1379,42 @@ void LauncherWindow::applyTheme(const QString &accent,
             "QWidget { background-color: %2; color: %7; "
             "font-family: 'Roboto', sans-serif; }"
             "QListWidget { background-color: %3; border: 1px solid %4; "
-            "border-radius: 0px; padding: 5px; outline: 0; }"
-            "QListWidget::item { padding: 10px; border-radius: 0px; "
+            "border-radius: 14px; padding: 8px; outline: 0; }"
+            "QListWidget::item { padding: 12px; border-radius: 10px; "
             "margin-bottom: 5px; border: none; }"
             "QListWidget::item:selected { background-color: %1; color: %7; }"
             "QListWidget::item:hover { background-color: %4; }"
             "QPushButton { background-color: %4; border: none; "
-            "border-radius: 10px; padding: 8px 16px; color: %7; "
+            "border-radius: 10px; padding: 9px 16px; color: %7; "
             "font-weight: bold; font-size: 14px; }"
             "QPushButton:hover { background-color: %5; }"
             "QPushButton:pressed { background-color: %2; }"
             "QPushButton#ActionButton { background-color: %1; color: %7; border-radius: 12px; }"
-            "QPushButton#ActionButton:hover { background-color: %1; opacity: 0.85; }"
+            "QPushButton#ActionButton:hover { background-color: %5; border: 1px solid %1; }"
+            "QPushButton#ActionButton:pressed { padding-top: 11px; padding-left: 18px; }"
+            "QPushButton#GhostButton { background: rgba(255,255,255,0.08); "
+            "border: 1px solid rgba(255,255,255,0.16); color: %7; }"
+            "QPushButton#GhostButton:hover { background: %5; border-color: %1; }"
+            "QLabel#BrandLabel { color: %7; font-size: 16px; font-weight: 800; "
+            "letter-spacing: 2px; background: transparent; }"
+            "QLabel#EyebrowLabel, QLabel#DashboardEyebrow { color: %6; "
+            "font-size: 11px; font-weight: 800; letter-spacing: 1px; "
+            "background: transparent; }"
+            "QLabel#DashboardSubtitle { color: %6; font-size: 15px; "
+            "background: transparent; }"
             "QLabel#Title { font-size: 14px; font-weight: bold; color: %1; background: transparent; }"
             "QLabel#VersionName { font-size: 14px; font-weight: bold; background: transparent; }"
             "QLabel#VersionType { font-size: 14px; color: %6; background: transparent; }"
-            "QLabel#Status { font-size: 4px; color: %6; padding: 5px; background: transparent; }"
+            "QLabel#Status { font-size: 11px; color: %6; padding: 7px; background: transparent; }"
             "QLabel#AboutText { font-size: 16px; background: transparent; }"
             "QWidget#ContextPanel { background-color: %3; border-radius: 0px; }"
             "QWidget#Sidebar { background-color: %2; }"
             "QPushButton#SidebarBtn { background: transparent; border: none; "
-            "border-left: 3px solid transparent; border-radius: 0px; padding: 14px; }"
+            "border-left: 3px solid transparent; border-radius: 12px; padding: 14px; }"
             "QPushButton#SidebarBtn:hover { background: %5; }"
-            "QPushButton#SidebarBtnActive { background: transparent; border: none; "
-            "border-left: 3px solid %1; border-radius: 0px; padding: 14px; }"
+            "QPushButton#SidebarBtn:pressed { background: %4; }"
+            "QPushButton#SidebarBtnActive { background: %4; border: none; "
+            "border-left: 3px solid %1; border-radius: 12px; padding: 14px; }"
             "QWidget#TitleBar { background-color: %2; }"
             "QLabel#TitleBarLabel { color: %6; font-size: 14px; font-weight: bold; background: transparent; }"
             "QPushButton#TitleBarBtn { background: transparent; border: none; border-radius: 0px; padding: 0px; color: %6; font-size: 14px; }"
@@ -1329,10 +1429,10 @@ void LauncherWindow::applyTheme(const QString &accent,
             // Divider
             "QFrame#Divider { color: %4; background-color: %4; max-width: 1px; }"
             // Floating dock
-            "QWidget#FloatingDock { background-color: rgba(%8, %9, %10, 0.82); "
-            "border-radius: 0px; border: 1px solid rgba(%11, %12, %13, 0.25); }"
+            "QWidget#FloatingDock { background-color: rgba(%8, %9, %10, 0.92); "
+            "border-radius: 18px; border: 1px solid rgba(%11, %12, %13, 0.35); }"
             // Dock combo
-            "QComboBox#DockCombo { background-color: %4; color: %7; border-radius: 0px; "
+            "QComboBox#DockCombo, QComboBox#ProfileCombo { background-color: %4; color: %7; border-radius: 10px; "
             "border: 1px solid %1; padding: 6px 12px; font-size: 14px; }"
             "QComboBox#DockCombo::drop-down { border: 0px; }"
             "QComboBox#DockCombo QAbstractItemView { background-color: %3; "
